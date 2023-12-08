@@ -33,4 +33,4 @@ Thanks for this! :)
     - It links the bytes of the kernel ELF file to the bootloader.
     - When booted, the bootloader reads and parses the appended ELF file. It then maps the program segments to virtual addresses in the page tables, zeroes the .bss section, and sets up a stack. Finally, it reads the entry point address (our _start function) and jumps to it.
 
-- 
+- qemu-system-x86_64 -drive format=raw,file=target/x86_64_custom_target/debug/bootimage-rust-os-playground.bin (now automated through cargo)

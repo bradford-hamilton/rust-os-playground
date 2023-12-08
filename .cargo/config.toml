@@ -4,3 +4,6 @@ build-std-features = ["compiler-builtins-mem"]
 
 [build]
 target = "x86_64_custom_target.json"
+
+[target.'cfg(target_os = "none")'] # The target.'cfg(target_os = "none")' table applies to all targets whose target configuration file’s "os" field is set to "none". The runner key specifies the command that should be invoked for cargo run. The command is run after a successful build with the executable path passed as the first argument.
+runner = "bootimage runner"
