@@ -1,0 +1,13 @@
+[package]
+name = "rust-os-playground"
+version = "0.1.0"
+edition = "2018"
+
+[profile.dev]
+panic = "abort" # Disable stack unwinding on panic
+
+[profile.release]
+panic = "abort" # Disable stack unwinding on panic
+
+[dependencies]
+bootloader = "0.9.23"
