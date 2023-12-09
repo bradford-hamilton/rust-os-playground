@@ -1,6 +1,9 @@
 #![no_std]  // Do not link rust standard library.
 #![no_main] // Disable all rust-level entrypoints.
 #![feature(const_mut_refs)]
+#![feature(custom_test_frameworks)]
+#![test_runner(crate::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
 
@@ -28,5 +31,28 @@ pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
     println!();
 
+    #[cfg(test)]
+    test_main();
+
     loop{}
+}
+
+// Our runner just prints a short debug message and then calls each test function
+// in the list. The argument type &[&dyn Fn()] is a slice of trait object references
+// of the Fn() trait. It is basically a list of references to types that can be
+// called like a function. Since the function is useless for non-test runs, we use
+// the #[cfg(test)] attribute to include it only for tests.
+#[cfg(test)]
+fn test_runner(tests: &[&dyn Fn()]) {
+    println!("Running {} tests", tests.len());
+    for test in tests {
+        test();
+    }
+}
+
+#[test_case]
+fn trivial_assertion() {
+    print!("trivial assertion...");
+    assert_eq!(1, 1);
+    println!("[ok]");
 }
