@@ -34,3 +34,29 @@ Thanks for this! :)
     - When booted, the bootloader reads and parses the appended ELF file. It then maps the program segments to virtual addresses in the page tables, zeroes the .bss section, and sets up a stack. Finally, it reads the entry point address (our _start function) and jumps to it.
 
 - qemu-system-x86_64 -drive format=raw,file=target/x86_64_custom_target/debug/bootimage-rust-os-playground.bin (now automated through cargo)
+
+- The VGA text buffer is a two-dimensional array with typically 25 rows and 80 columns, which is directly rendered to the screen.
+    
+    Bit(s)	Value
+    0-7	    ASCII code point
+    8-11	Foreground color
+    12-14	Background color
+    15	    Blink
+
+- The second byte defines how the character is displayed. The first four bits define the foreground color, the next three bits the background color, and the last bit whether the character should blink. The following colors are available:
+
+    Number	Color	    Number + Bright Bit	  Bright Color
+    0x0	    Black	    0x8	                  Dark Gray
+    0x1	    Blue	    0x9	                  Light Blue
+    0x2	    Green	    0xa	                  Light Green
+    0x3	    Cyan	    0xb	                  Light Cyan
+    0x4	    Red	        0xc	                  Light Red
+    0x5	    Magenta	    0xd	                  Pink
+    0x6	    Brown	    0xe	                  Yellow
+    0x7	    Light Gray	0xf	                  White
+
+- Bit 4 is the bright bit, which turns, for example, blue into light blue. For the background color, this bit is repurposed as the blink bit.
+
+- The writer will always write to the last line and shift lines up when a line is full (or on \n). The column_position field keeps track of the current position in the last row. The current foreground and background colors are specified by color_code and a reference to the VGA buffer is stored in buffer. Note that we need an explicit lifetime here to tell the compiler how long the reference is valid. The 'static lifetime specifies that the reference is valid for the whole program run time (which is true for the VGA text buffer).
+
+- Note that we only have a single unsafe block in our code, which is needed to create a Buffer reference pointing to 0xb8000. Afterwards, all operations are safe. Rust uses bounds checking for array accesses by default, so we can’t accidentally write outside the buffer. Thus, we encoded the required conditions in the type system and are able to provide a safe interface to the outside.
