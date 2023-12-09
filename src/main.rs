@@ -10,7 +10,8 @@ mod vga_buffer;
 /// This function should never return, so it is marked as
 /// a diverging function by returning the “never” type !
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", info);
     loop{}
 }
 
