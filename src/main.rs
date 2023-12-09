@@ -74,23 +74,33 @@ pub fn exit_qemu(exit_code: QemuExitCodeCode) {
     }
 }
 
+pub trait Testable {
+    fn run(&self) -> ();
+}
+
+impl<T> Testable for T where T: Fn() {
+    fn run(&self) {
+        serial_print!("{}...\t", core::any::type_name::<T>());
+        self();
+        serial_println!("[ok]");
+    }
+}
+
 // Our runner just prints a short debug message and then calls each test function
 // in the list. The argument type &[&dyn Fn()] is a slice of trait object references
 // of the Fn() trait. It is basically a list of references to types that can be
 // called like a function. Since the function is useless for non-test runs, we use
 // the #[cfg(test)] attribute to include it only for tests.
 #[cfg(test)]
-fn test_runner(tests: &[&dyn Fn()]) {
+fn test_runner(tests: &[&dyn Testable]) {
     serial_println!("Running {} tests", tests.len());
     for test in tests {
-        test();
+        test.run();
     }
     exit_qemu(QemuExitCodeCode::Success);
 }
 
 #[test_case]
 fn trivial_assertion() {
-    serial_print!("trivial assertion...");
     assert_eq!(1, 1);
-    serial_println!("[ok]");
 }
