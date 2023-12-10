@@ -68,3 +68,7 @@ Thanks for this! :)
 - The disadvantage compared to the default test framework is that many advanced features, such as should_panic tests, are not available. Instead, it is up to the implementation to provide such features itself if needed. This is ideal for us since we have a very special execution environment where the default implementations of such advanced features probably wouldn’t work anyway. For example, the #[should_panic] attribute relies on stack unwinding to catch the panics, which we disabled for our kernel.
 
 - When we run cargo test now, we see that it now succeeds (if it doesn’t, see the note below). However, we still see our “Hello World” instead of the message from our test_runner. The reason is that our _start function is still used as entry point. The custom test frameworks feature generates a main function that calls test_runner, but this function is ignored because we use the #[no_main] attribute and provide our own entry point.
+
+- The convention for integration tests in Rust is to put them into a tests directory in the project root (i.e., next to the src directory). Both the default test framework and custom test frameworks will automatically pick up and execute all tests in that directory.
+
+- All integration tests are their own executables and completely separate from our main.rs. This means that each test needs to define its own entry point function.
