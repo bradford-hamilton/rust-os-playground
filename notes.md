@@ -72,3 +72,16 @@ Thanks for this! :)
 - The convention for integration tests in Rust is to put them into a tests directory in the project root (i.e., next to the src directory). Both the default test framework and custom test frameworks will automatically pick up and execute all tests in that directory.
 
 - All integration tests are their own executables and completely separate from our main.rs. This means that each test needs to define its own entry point function.
+
+- cargo clippy --all-targets --all-features
+
+- Explained how to set up a test framework for our Rust kernel. We used Rust’s custom test frameworks feature to implement support for a simple #[test_case] attribute in our bare-metal environment. Using the isa-debug-exit device of QEMU, our test runner can exit QEMU after running the tests and report the test status. To print error messages to the console instead of the VGA buffer, we created a basic driver for the serial port.
+
+- Here is a short overview of the things that the x86-interrupt calling convention takes care of:
+    - Retrieving the arguments: Most calling conventions expect that the arguments are passed in registers. This is not possible for exception handlers since we must not overwrite any register values before backing them up on the stack. Instead, the x86-interrupt calling convention is aware that the arguments already lie on the stack at a specific offset.
+    - Returning using iretq: Since the interrupt stack frame completely differs from stack frames of normal function calls, we can’t return from handler functions through the normal ret instruction. So instead, the iretq instruction must be used.
+    - Handling the error code: The error code, which is pushed for some exceptions, makes things much more complex. It changes the stack alignment (see the next point) and needs to be popped off the stack before returning. The x86-interrupt calling convention handles all that complexity. However, it doesn’t know which handler function is used for which exception, so it needs to deduce that information from the number of function arguments. That means the programmer is still responsible for using the correct function type for each exception. Luckily, the InterruptDescriptorTable type defined by the x86_64 crate ensures that the correct function types are used.
+    - Aligning the stack: Some instructions (especially SSE instructions) require a 16-byte stack alignment. The CPU ensures this alignment whenever an exception occurs, but for some exceptions it destroys it again later when it pushes an error code. The x86-interrupt calling convention takes care of this by realigning the stack in this case.
+
+- A guard page is a special memory page at the bottom of a stack that makes it possible to detect stack overflows. The page is not mapped to any physical frame, so accessing it causes a page fault instead of silently corrupting other memory. The bootloader sets up a guard page for our kernel stack, so a stack overflow causes a page fault.
+

@@ -13,8 +13,24 @@ use rust_os_playground::println;
 pub extern "C" fn _start() -> ! {
     println!("Hello World{}", "!");
 
+    rust_os_playground::init();
+
+    // Invoke a breakpoint exception:
+    // x86_64::instructions::interrupts::int3();
+
+    // Trigger a page fault:
+    // We use unsafe to write to the invalid address 0xdeadbeef.
+    // The virtual address is not mapped to a physical address in
+    // the page tables, so a page fault occurs. We haven’t registered
+    // a page fault handler in our IDT, so a double fault occurs.
+    unsafe {
+        *(0xDEADBEEF as *mut u8) = 42;
+    };
+
     #[cfg(test)]
     test_main();
+
+    println!("we didn't crash on the interrupt!");
 
     loop {}
 }

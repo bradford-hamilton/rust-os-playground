@@ -5,22 +5,31 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+#![feature(abi_x86_interrupt)]
 
+pub mod interrupts;
 pub mod serial;
 pub mod vga_buffer;
 
 use core::panic::PanicInfo;
 
+// Remember, this _start function is used when running cargo test --lib,
+// since Rust tests the lib.rs completely independently of the main.rs
 /// Entry point for `cargo test`
 #[cfg(test)]
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    init();
     test_main();
     loop {}
 }
 
+pub fn init() {
+    interrupts::init_idt();
+}
+
 pub trait Testable {
-    fn run(&self) -> ();
+    fn run(&self);
 }
 
 impl<T> Testable for T
@@ -44,7 +53,7 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     for test in tests {
         test.run();
     }
-    exit_qemu(QemuExitCodeCode::Success);
+    exit_qemu(QemuExitCode::Success);
 }
 
 #[test_case]
@@ -54,7 +63,7 @@ fn trivial_assertion() {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
-pub enum QemuExitCodeCode {
+pub enum QemuExitCode {
     Success = 0x10,
     Failure = 0x11,
 }
@@ -63,7 +72,7 @@ pub enum QemuExitCodeCode {
 // Then it writes the passed exit code to the port. We use u32 because we specified the iosize
 // of the isa-debug-exit device as 4 bytes. Both operations are unsafe because writing to an
 // I/O port can generally result in arbitrary behavior.
-pub fn exit_qemu(exit_code: QemuExitCodeCode) {
+pub fn exit_qemu(exit_code: QemuExitCode) {
     use x86_64::instructions::port::Port;
 
     unsafe {
@@ -75,7 +84,7 @@ pub fn exit_qemu(exit_code: QemuExitCodeCode) {
 pub fn test_panic_handler(info: &PanicInfo) -> ! {
     serial_println!("[failed]\n");
     serial_println!("Error: {}\n", info);
-    exit_qemu(QemuExitCodeCode::Success);
+    exit_qemu(QemuExitCode::Success);
     loop {}
 }
 

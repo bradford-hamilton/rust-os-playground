@@ -78,7 +78,7 @@ impl Writer {
 
                 self.buffer.chars[row][col].write(ScreenChar {
                     ascii_char: byte,
-                    color_code: color_code,
+                    color_code,
                 });
 
                 self.column_position += 1;
@@ -91,7 +91,7 @@ impl Writer {
         for byte in s.bytes() {
             match byte {
                 // Printable ASCII byte or newline:
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                0x20..=0x7E | b'\n' => self.write_byte(byte),
                 // Not part of printable ASCII range.
                 _ => self.write_byte(0xfe),
             }
