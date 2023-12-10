@@ -5,14 +5,12 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use rust_os_playground::println;
+use rust_os_playground::{hlt_loop, println};
 
 // Don't mangle function name (_start) - this is the entry point since the
 // linker looks for a function named `_start` by default.
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    println!("Hello World{}", "!");
-
     rust_os_playground::init();
 
     // Invoke a breakpoint exception:
@@ -23,16 +21,16 @@ pub extern "C" fn _start() -> ! {
     // The virtual address is not mapped to a physical address in
     // the page tables, so a page fault occurs. We haven’t registered
     // a page fault handler in our IDT, so a double fault occurs.
-    unsafe {
-        *(0xDEADBEEF as *mut u8) = 42;
-    };
+    // unsafe {
+    //     *(0xDEADBEEF as *mut u8) = 42;
+    // };
 
     #[cfg(test)]
     test_main();
 
-    println!("we didn't crash on the interrupt!");
+    println!("Hello World{}", "!");
 
-    loop {}
+    rust_os_playground::hlt_loop();
 }
 
 /// This function is called on panic.
@@ -42,7 +40,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    rust_os_playground::hlt_loop();
 }
 
 #[cfg(test)]

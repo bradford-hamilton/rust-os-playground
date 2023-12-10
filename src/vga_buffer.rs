@@ -1,6 +1,8 @@
+use core::fmt::Write;
 use lazy_static::lazy_static;
 use spin::Mutex;
 use volatile::Volatile;
+use x86_64::instructions::interrupts;
 
 // We use a C-like enum here to explicitly specify the number for each color.
 // Because of the repr(u8) attribute, each enum variant is stored as a u8.
@@ -163,10 +165,13 @@ macro_rules! println {
 // the function needs to be public. However, since we consider this a private
 // implementation detail, we add the doc(hidden) attribute to hide it from the
 // generated documentation.
+/// Prints the given formatted string to the VGA text buffer
+/// through the global `WRITER` instance.
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
-    use core::fmt::Write;
-    WRITER.lock().write_fmt(args).unwrap();
+    interrupts::without_interrupts(|| {
+        WRITER.lock().write_fmt(args).unwrap();
+    })
 }
 
 #[test_case]
@@ -186,10 +191,14 @@ fn test_println_many() {
 #[test_case]
 fn test_println_output() {
     let s = "some test string that fits on a single line";
-    println!("{}", s);
 
-    for (i, c) in s.chars().enumerate() {
-        let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
-        assert_eq!(char::from(screen_char.ascii_char), c);
-    }
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writeln!(writer, "\n{}", s).expect("writeln failed");
+
+        for (i, c) in s.chars().enumerate() {
+            let screen_char = writer.buffer.chars[BUFFER_HEIGHT - 2][i].read();
+            assert_eq!(char::from(screen_char.ascii_char), c);
+        }
+    })
 }

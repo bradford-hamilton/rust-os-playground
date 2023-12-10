@@ -22,12 +22,22 @@ use core::panic::PanicInfo;
 pub extern "C" fn _start() -> ! {
     init();
     test_main();
-    loop {}
+    hlt_loop();
 }
 
 pub fn init() {
     interrupts::init_idt();
     gdt::init();
+    unsafe { interrupts::PICS.lock().initialize() };
+    x86_64::instructions::interrupts::enable();
+}
+
+pub fn hlt_loop() -> ! {
+    loop {
+        // This is just a thin wrapper around the assembly instruction.
+        // It is safe because there’s no way it can compromise memory safety.
+        x86_64::instructions::hlt();
+    }
 }
 
 pub trait Testable {
@@ -87,7 +97,7 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
     serial_println!("[failed]\n");
     serial_println!("Error: {}\n", info);
     exit_qemu(QemuExitCode::Success);
-    loop {}
+    hlt_loop();
 }
 
 #[cfg(test)]
