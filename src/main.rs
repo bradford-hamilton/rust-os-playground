@@ -5,7 +5,7 @@
 #![reexport_test_harness_main = "test_main"]
 
 use core::panic::PanicInfo;
-use rust_os_playground::{hlt_loop, println};
+use rust_os_playground::println;
 
 // Don't mangle function name (_start) - this is the entry point since the
 // linker looks for a function named `_start` by default.
@@ -17,12 +17,9 @@ pub extern "C" fn _start() -> ! {
     // x86_64::instructions::interrupts::int3();
 
     // Trigger a page fault:
-    // We use unsafe to write to the invalid address 0xdeadbeef.
-    // The virtual address is not mapped to a physical address in
-    // the page tables, so a page fault occurs. We haven’t registered
-    // a page fault handler in our IDT, so a double fault occurs.
+    // let ptr = 0xDEADBEEF as *mut u8;
     // unsafe {
-    //     *(0xDEADBEEF as *mut u8) = 42;
+    //     *ptr = 42;
     // };
 
     #[cfg(test)]

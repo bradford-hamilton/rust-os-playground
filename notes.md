@@ -85,3 +85,89 @@ Thanks for this! :)
 
 - A guard page is a special memory page at the bottom of a stack that makes it possible to detect stack overflows. The page is not mapped to any physical frame, so accessing it causes a page fault instead of silently corrupting other memory. The bootloader sets up a guard page for our kernel stack, so a stack overflow causes a page fault.
 
+- Segmentation was already introduced in 1978, originally to increase the amount of addressable memory. The situation back then was that CPUs only used 16-bit addresses, which limited the amount of addressable memory to 64 KiB. To make more than these 64 KiB accessible, additional segment registers were introduced, each containing an offset address. The CPU automatically added this offset on each memory access, so that up to 1 MiB of memory was accessible.
+
+![Virtual Address Translation](/assets/virt-to-phys-addr.png)
+
+- Another advantage is that programs can now be placed at arbitrary physical memory locations, even if they use completely different virtual addresses. Thus, the OS can utilize the full amount of available memory without needing to recompile programs.
+
+- One way to combat this fragmentation is to pause execution, move the used parts of the memory closer together, update the translation, and then resume execution:
+
+![Defragmentation of Sorts](/assets/defrag.png)
+
+- The disadvantage of this defragmentation process is that it needs to copy large amounts of memory, which decreases performance. It also needs to be done regularly before the memory becomes too fragmented. This makes performance unpredictable since programs are paused at random times and might become unresponsive.
+
+- The fragmentation problem is one of the reasons that segmentation is no longer used by most systems. In fact, segmentation is not even supported in 64-bit mode on x86 anymore. Instead, paging is used, which completely avoids the fragmentation problem.
+
+- The idea is to divide both the virtual and physical memory space into small, fixed-size blocks. The blocks of the virtual memory space are called pages, and the blocks of the physical address space are called frames. Each page can be individually mapped to a frame, which makes it possible to split larger memory regions across non-continuous physical frames. The advantage of this becomes visible if we recap the example of the fragmented memory space, but use paging instead of segmentation this time:
+
+![Paging](/assets/paging.png)
+
+- Compared to segmentation, paging uses lots of small, fixed-sized memory regions instead of a few large, variable-sized regions. Since every frame has the same size, there are no frames that are too small to be used, so no fragmentation occurs... Or it seems like no fragmentation occurs. There is still some hidden kind of fragmentation, the so-called internal fragmentation. Internal fragmentation occurs because not every memory region is an exact multiple of the page size. Imagine a program of size 101 in the above example: It would still need three pages of size 50, so it would occupy 49 bytes more than needed. To differentiate the two types of fragmentation, the kind of fragmentation that happens when using segmentation is called external fragmentation.
+
+- Internal fragmentation is unfortunate but often better than the external fragmentation that occurs with segmentation. It still wastes memory, but does not require defragmentation and makes the amount of fragmentation predictable (on average half a page per memory region).
+
+- We saw that each of the potentially millions of pages is individually mapped to a frame. This mapping information needs to be stored somewhere. Segmentation uses an individual segment selector register for each active memory region, which is not possible for paging since there are way more pages than registers. Instead, paging uses a table structure called page table to store the mapping information.
+
+![Page Tables](/assets/page-tables.png)
+
+- To reduce the wasted memory, we can use a two-level page table. The idea is that we use different page tables for different address regions. An additional table called level 2 page table contains the mapping between address regions and (level 1) page tables.
+
+- This is best explained by an example. Let’s define that each level 1 page table is responsible for a region of size 10_000. Then the following tables would exist for the above example mapping:
+
+![Two Level Page Table](/assets/two-level-page-table.png)
+
+- The principle of two-level page tables can be extended to three, four, or more levels. Then the page table register points to the highest level table, which points to the next lower level table, which points to the next lower level, and so on. The level 1 page table then points to the mapped frame. The principle in general is called a multilevel or hierarchical page table.
+
+- The x86_64 architecture uses a 4-level page table and a page size of 4 KiB. Each page table, independent of the level, has a fixed size of 512 entries. Each entry has a size of 8 bytes, so each table is 512 * 8 B = 4 KiB large and thus fits exactly into one page.
+
+- The page table index for each level is derived directly from the virtual address:
+
+![Page Table Index](/assets/page-table-index.png)
+
+- We see that each table index consists of 9 bits, which makes sense because each table has 2^9 = 512 entries. The lowest 12 bits are the offset in the 4 KiB page (2^12 bytes = 4 KiB). Bits 48 to 64 are discarded, which means that x86_64 is not really 64-bit since it only supports 48-bit addresses.
+
+![Example Translation](/assets/example-translation.png)
+
+- The above page table hierarchy maps two pages (in blue). From the page table indices, we can deduce that the virtual addresses of these two pages are 0x803FE7F000 and 0x803FE00000. Let’s see what happens when the program tries to read from address 0x803FE7F5CE. First, we convert the address to binary and determine the page table indices and the page offset for the address:
+
+![Virtual Address](/assets/virtual-address.png)
+
+- We start by reading the address of the level 4 table out of the CR3 register.
+- The level 4 index is 1, so we look at the entry with index 1 of that table, which tells us that the level 3 table is stored at address 16 KiB.
+- We load the level 3 table from that address and look at the entry with index 0, which points us to the level 2 table at 24 KiB.
+- The level 2 index is 511, so we look at the last entry of that page to find out the address of the level 1 table.
+- Through the entry with index 127 of the level 1 table, we finally find out that the page is mapped to frame 12 KiB, or 0x3000 in hexadecimal.
+- The final step is to add the page offset to the frame address to get the physical address 0x3000 + 0x5ce = 0x35ce.
+
+![Example Translation More Detail](/assets/example-translation-more-detail.png)
+
+- It’s important to note that even though this example used only a single instance of each table, there are typically multiple instances of each level in each address space. At maximum, there are:
+
+- one level 4 table,
+- 512 level 3 tables (because the level 4 table has 512 entries),
+- 512 * 512 level 2 tables (because each of the 512 level 3 tables has 512 entries), and
+- 512 * 512 * 512 level 1 tables (512 entries for each level 2 table).
+
+- Each page table entry is 8 bytes (64 bits) large and has the following format:
+```
+Bit(s)	    Name	                Meaning
+0           present	                the page is currently in memory
+1	        writable	            it’s allowed to write to this page
+2	        user accessible	        if not set, only kernel mode code can access this page
+3	        write-through caching	writes go directly to memory
+4	        disable cache	        no cache is used for this page
+5	        accessed	            the CPU sets this bit when this page is used
+6	        dirty	                the CPU sets this bit when a write to this page occurs
+7	        huge page/null	        must be 0 in P1 and P4, creates a 1 GiB page in P3, creates a 2 MiB page in P2
+8	        global	                page isn’t flushed from caches on address space switch (PGE bit of CR4 register must be set)
+9-11	    available	            can be used freely by the OS
+12-51	    physical address	    the page aligned 52bit physical address of the frame or the next page table
+52-62	    available	            can be used freely by the OS
+63	        no execute	            forbid executing code on this page (the NXE bit in the EFER register must be set)
+```
+
+- A 4-level page table makes the translation of virtual addresses expensive because each translation requires four memory accesses. To improve performance, the x86_64 architecture caches the last few translations in the so-called translation lookaside buffer (TLB). This allows skipping the translation when it is still cached.
+
+- One thing that we did not mention yet: Our kernel already runs on paging. The bootloader that we added in the “A minimal Rust Kernel” post has already set up a 4-level paging hierarchy that maps every page of our kernel to a physical frame. The bootloader does this because paging is mandatory in 64-bit mode on x86_64. This means that every memory address that we used in our kernel was a virtual address. Accessing the VGA buffer at address 0xb8000 only worked because the bootloader identity mapped that memory page, which means that it mapped the virtual page 0xb8000 to the physical frame 0xb8000.
+
