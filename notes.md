@@ -171,3 +171,23 @@ Bit(s)	    Name	                Meaning
 
 - One thing that we did not mention yet: Our kernel already runs on paging. The bootloader that we added in the “A minimal Rust Kernel” post has already set up a 4-level paging hierarchy that maps every page of our kernel to a physical frame. The bootloader does this because paging is mandatory in 64-bit mode on x86_64. This means that every memory address that we used in our kernel was a virtual address. Accessing the VGA buffer at address 0xb8000 only worked because the bootloader identity mapped that memory page, which means that it mapped the virtual page 0xb8000 to the physical frame 0xb8000.
 
+- The important thing here is that each page entry stores the physical address of the next table. This avoids the need to run a translation for these addresses too, which would be bad for performance and could easily cause endless translation loops.
+
+- The problem for us is that we can’t directly access physical addresses from our kernel since our kernel also runs on top of virtual addresses. For example, when we access address 4 KiB we access the virtual address 4 KiB, not the physical address 4 KiB where the level 4 page table is stored. When we want to access the physical address 4 KiB, we can only do so through some virtual address that maps to it.
+
+- The map_physical_memory feature maps the complete physical memory somewhere into the virtual address space. Thus, the kernel has access to all physical memory and can follow the Map the Complete Physical Memory approach.
+- With the recursive_page_table feature, the bootloader maps an entry of the level 4 page table recursively. This allows the kernel to access the page tables as described in the Recursive Page Tables section.
+- We choose the first approach for our kernel since it is simple, platform-independent, and more powerful (it also allows access to non-page-table-frames).
+- With this feature enabled (features = ["map_physical_memory"]), the bootloader maps the complete physical memory to some unused virtual address range. To communicate the virtual address range to our kernel, the bootloader passes a boot information structure.
+
+- The bootloader crate defines a BootInfo struct that contains all the information it passes to our kernel. The struct is still in an early stage, so expect some breakage when updating to future semver-incompatible bootloader versions. With the map_physical_memory feature enabled, it currently has the two fields memory_map and physical_memory_offset:
+    - The memory_map field contains an overview of the available physical memory. This tells our kernel how much physical memory is available in the system and which memory regions are reserved for devices such as the VGA hardware. The memory map can be queried from the BIOS or UEFI firmware, but only very early in the boot process. For this reason, it must be provided by the bootloader because there is no way for the kernel to retrieve it later. We will need the memory map later in this post.
+    - The physical_memory_offset tells us the virtual start address of the physical memory mapping. By adding this offset to a physical address, we get the corresponding virtual address. This allows us to access arbitrary physical memory from our kernel.
+    - This physical memory offset can be customized by adding a [package.metadata.bootloader] table in Cargo.toml and setting the field physical-memory-offset = "0x0000f00000000000" (or any other value). However, note that the bootloader can panic if it runs into physical address values that start to overlap with the the space beyond the offset, i.e., areas it would have previously mapped to some other early physical addresses. So in general, the higher the value (> 1 TiB), the better.
+
+- Translating virtual to physical addresses is a common task in an OS kernel, therefore the x86_64 crate provides an abstraction for it. The implementation already supports huge pages and several other page table functions apart from translate_addr, so we will use it in the following instead of adding huge page support to our own implementation.
+
+- At the basis of the abstraction are two traits that define various page table mapping functions:
+    - The Mapper trait is generic over the page size and provides functions that operate on pages. Examples are translate_page, which translates a given page to a frame of the same size, and map_to, which creates a new mapping in the page table.
+    - The Translate trait provides functions that work with multiple page sizes, such as translate_addr or the general translate.
+
