@@ -85,7 +85,7 @@ impl LinkedListAllocator {
 
         // Look for a large enough memory region in the linked list
         while let Some(ref mut region) = current.next {
-            if let Ok(alloc_start) = Self::alloc_from_region(&region, size, align) {
+            if let Ok(alloc_start) = Self::alloc_from_region(region, size, align) {
                 // Region suitable for allocation -> remove node from list
                 let next = region.next.take();
                 let ret = Some((current.next.take().unwrap(), alloc_start));

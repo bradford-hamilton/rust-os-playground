@@ -12,8 +12,9 @@ use core::panic::PanicInfo;
 use rust_os_playground::allocator;
 use rust_os_playground::memory::{self, BootInfoFrameAllocator};
 use rust_os_playground::println;
-use rust_os_playground::task::{simple_executor::SimpleExecutor, Task};
+use rust_os_playground::task::{executor::Executor, keyboard, Task};
 use x86_64::VirtAddr;
+
 // Don't mangle function name (_start) - this is the entry point since
 // the linker looks for a function named `_start` by default. Update:
 // After adding the &'static BootInfo argument, to make sure that the
@@ -32,10 +33,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
-
-    let mut executor = SimpleExecutor::new();
-    executor.spawn(Task::new(example_task()));
-    executor.run();
 
     // Allocate a number on the heap
     let x = Box::new(42);
@@ -65,7 +62,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
 
     println!("It did not crash!");
-    rust_os_playground::hlt_loop();
+
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(example_task()));
+    executor.spawn(Task::new(keyboard::print_keypresses()));
+    executor.run();
 }
 
 async fn async_number() -> u32 {
