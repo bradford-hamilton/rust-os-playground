@@ -6,11 +6,10 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use rust_os_playground::allocator;
-use rust_os_playground::memory::{self, BootInfoFrameAllocator};
+use rust_os_playground::memory;
 use rust_os_playground::println;
 use rust_os_playground::task::{executor::Executor, keyboard, Task};
 use x86_64::VirtAddr;
@@ -24,44 +23,19 @@ use x86_64::VirtAddr;
 // point. Let’s rewrite our entry point function to use this macro:
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    println!("Hello World{}", "!");
+    println!("Welcome to the system{}", "!");
 
     rust_os_playground::init();
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
+    let mut frame_allocator =
+        unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
-    // Allocate a number on the heap
-    let x = Box::new(42);
-    println!("heap_value at {:p}", x);
-
-    // Create a dynamically sized vector
-    let mut vec = Vec::new();
-    for i in 0..500 {
-        vec.push(i);
-    }
-    println!("vec at {:p}", vec.as_slice());
-
-    // Create a reference counted vector -> will be freed when count reaches 0
-    let reference_counted = Rc::new(vec![1, 2, 3]);
-    let cloned_reference = reference_counted.clone();
-    println!(
-        "current reference count is {}",
-        Rc::strong_count(&cloned_reference)
-    );
-    core::mem::drop(reference_counted);
-    println!(
-        "reference count is {} now",
-        Rc::strong_count(&cloned_reference)
-    );
-
     #[cfg(test)]
     test_main();
-
-    println!("It did not crash!");
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(example_task()));
