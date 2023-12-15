@@ -7,7 +7,7 @@ use x86_64::{
     VirtAddr,
 };
 
-pub mod bump;
+use self::linked_list::LinkedListAllocator;
 
 // The responsibility of an allocator is to manage the available heap memory.
 // It needs to return unused memory on alloc calls and keep track of memory
@@ -21,6 +21,9 @@ pub mod bump;
 // applications and scale to any number of processors. For maximal performance,
 // it could even optimize the memory layout with respect to the CPU caches to
 // improve cache locality and avoid false sharing.
+
+pub mod bump;
+pub mod linked_list;
 
 /// A wrapper around spin::Mutex to permit trait implementations.
 pub struct Locked<A> {
@@ -66,7 +69,8 @@ fn align_up(addr: usize, align: usize) -> usize {
 
 #[global_allocator]
 // static ALLOCATOR: LockedHeap = LockedHeap::empty();
-static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
+// static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
+static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
 
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
