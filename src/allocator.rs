@@ -1,5 +1,3 @@
-use bump::BumpAllocator;
-// use linked_list_allocator::LockedHeap;
 use x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
@@ -7,7 +5,10 @@ use x86_64::{
     VirtAddr,
 };
 
-use self::linked_list::LinkedListAllocator;
+// use bump::BumpAllocator;
+// use linked_list_allocator::LockedHeap;
+// use linked_list::LinkedListAllocator;
+use fixed_size_block::FixedSizeBlockAllocator;
 
 // The responsibility of an allocator is to manage the available heap memory.
 // It needs to return unused memory on alloc calls and keep track of memory
@@ -23,6 +24,7 @@ use self::linked_list::LinkedListAllocator;
 // improve cache locality and avoid false sharing.
 
 pub mod bump;
+pub mod fixed_size_block;
 pub mod linked_list;
 
 /// A wrapper around spin::Mutex to permit trait implementations.
@@ -70,7 +72,8 @@ fn align_up(addr: usize, align: usize) -> usize {
 #[global_allocator]
 // static ALLOCATOR: LockedHeap = LockedHeap::empty();
 // static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
-static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
+// static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator::new());
+static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
